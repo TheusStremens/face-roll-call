@@ -1,75 +1,128 @@
+import src.gui_utils as utils
 import numpy as np
 import cv2
+from enum import Enum
+
+
+class Mode(Enum):
+    UNSET = 0
+    CALL = 1
+    REGISTER = 2
+    LOAD_FILE = 3
 
 
 class GUI:
     def __init__(self, window_name="Face Call Roll"):
         self.canvas = np.zeros(shape=[512, 512, 3], dtype=np.uint8)
-        self.background = cv2.imread("background.jpg", -1)
-        self.button_img = cv2.imread("button2.png", -1)
-        self.button_img = cv2.resize(self.button_img, (0, 0), fx=0.5, fy=0.5)
+        self.background = cv2.imread("resources/background.jpg", -1)
+        self.btn_img = cv2.imread("resources/button_crop.png", -1)
+        self.btn_img = cv2.resize(self.btn_img, (0, 0), fx=0.5, fy=0.5)
         self.define_buttons_config()
         self.draw_buttons()
+        self.draw_log_area()
         self.window_name = window_name
+        self.mode = Mode.UNSET
         cv2.namedWindow(self.window_name)
         cv2.setMouseCallback(self.window_name, self.on_click)
 
+    def draw_log_area(self):
+        height_offset = 20
+        bg_height, bg_width, _ = self.background.shape
+        log_height = int(bg_height * 0.2)
+        log_width = int(bg_width * 0.7)
+        x = int((bg_width/2) - (log_width/2))
+        y = bg_height - height_offset - log_height
+        p1 = (x, y)
+        p2 = (x+log_width, y+log_height)
+        cv2.rectangle(self.background, p1, p2, (0, 0, 0), -1, cv2.LINE_AA)
+        cv2.rectangle(self.background, p1, p2, (209, 140, 5), 5, cv2.LINE_AA)
+        cv2.rectangle(self.background, p1, p2, (215, 194, 165), 2, cv2.LINE_AA)
+
     def define_buttons_config(self):
-        self.button_height, self.button_width, _ = self.button_img.shape
+        self.btn_height, self.btn_width, _ = self.btn_img.shape
         self.bg_width = int(self.background.shape[1])
         proportion = int(self.bg_width / 3)
 
-        offset = int(proportion + (self.button_width/2))
-        offset_last = self.bg_width - self.button_width - 10
+        offset = int(proportion + (self.btn_width / 2))
+        offset_last = self.bg_width - self.btn_width - 10
         height_offset = 20
+        btn_size = [self.btn_width, self.btn_height]
 
-        self.button_call_pos = (10, height_offset)
-        self.button_register_pos = (offset, height_offset)
-        self.button_class_file_pos = (offset_last, height_offset)
+        self.btn_call_rect = [10, height_offset, *btn_size]
+        self.btn_call_pos = self.btn_call_rect[0:2]
+
+        self.btn_register_rect = [offset, height_offset, *btn_size]
+        self.btn_register_pos = self.btn_register_rect[0:2]
+
+        self.btn_class_file_rect = [offset_last, height_offset, *btn_size]
+        self.btn_class_file_pos = self.btn_class_file_rect[0:2]
 
     def draw_buttons(self):
         temp_img = self.background.copy()
-        overlay = self.transparent_overlay(temp_img, self.button_img, self.button_call_pos)
-        overlay = self.transparent_overlay(temp_img, self.button_img, self.button_register_pos)
-        overlay = self.transparent_overlay(temp_img, self.button_img, self.button_class_file_pos)
+        overlay = self.transparent_overlay(
+            temp_img, self.btn_img, self.btn_call_pos
+        )
+        overlay = self.transparent_overlay(
+            temp_img, self.btn_img, self.btn_register_pos
+        )
+        overlay = self.transparent_overlay(
+            temp_img, self.btn_img, self.btn_class_file_pos
+        )
         opacity = 1.0
         cv2.addWeighted(
             overlay, opacity, self.background, 1 - opacity, 0, self.background
         )
 
-    def draw_rounded_rectangle(self, img, pt1, pt2, color, thickness, r, d):
-        x1, y1 = pt1
-        x2, y2 = pt2
-        # Top left
-        cv2.line(img, (x1 + r, y1), (x1 + r + d, y1), color, thickness, lineType=cv2.LINE_AA)
-        cv2.line(img, (x1, y1 + r), (x1, y1 + r + d), color, thickness, lineType=cv2.LINE_AA)
-        cv2.ellipse(img, (x1 + r, y1 + r), (r, r), 180, 0, 90, color, thickness, lineType=cv2.LINE_AA)
-        # Top right
-        cv2.line(img, (x2 - r, y1), (x2 - r - d, y1), color, thickness, lineType=cv2.LINE_AA)
-        cv2.line(img, (x2, y1 + r), (x2, y1 + r + d), color, thickness, lineType=cv2.LINE_AA)
-        cv2.ellipse(img, (x2 - r, y1 + r), (r, r), 270, 0, 90, color, thickness, lineType=cv2.LINE_AA)
-        # Bottom left
-        cv2.line(img, (x1 + r, y2), (x1 + r + d, y2), color, thickness, lineType=cv2.LINE_AA)
-        cv2.line(img, (x1, y2 - r), (x1, y2 - r - d), color, thickness, lineType=cv2.LINE_AA)
-        cv2.ellipse(img, (x1 + r, y2 - r), (r, r), 90, 0, 90, color, thickness, lineType=cv2.LINE_AA)
-        # Bottom right
-        cv2.line(img, (x2 - r, y2), (x2 - r - d, y2), color, thickness, lineType=cv2.LINE_AA)
-        cv2.line(img, (x2, y2 - r), (x2, y2 - r - d), color, thickness, lineType=cv2.LINE_AA)
-        cv2.ellipse(img, (x2 - r, y2 - r), (r, r), 0, 0, 90, color, thickness, lineType=cv2.LINE_AA)
+    def draw_buttons_text(self):
+        label = "Call"
+        text_pos = utils.get_text_position(label, self.btn_call_rect)
+        cv2.putText(self.background,
+                    label, text_pos,
+                    0,
+                    1.0,
+                    (255, 255, 255),
+                    thickness=2,
+                    lineType=cv2.LINE_AA)
+        label = "Register"
+        text_pos = utils.get_text_position(label, self.btn_register_rect)
+        cv2.putText(self.background,
+                    label, text_pos,
+                    0,
+                    1.0,
+                    (255, 255, 255),
+                    thickness=2,
+                    lineType=cv2.LINE_AA)
+        label = "Class File"
+        text_pos = utils.get_text_position(label, self.btn_class_file_rect)
+        cv2.putText(self.background,
+                    label, text_pos,
+                    0,
+                    1.0,
+                    (255, 255, 255),
+                    thickness=2,
+                    lineType=cv2.LINE_AA)
 
     def update_frame(self, frame):
         self.canvas = frame.copy()
 
     def display(self):
+        self.draw_buttons_text()
         cv2.imshow(self.window_name, self.background)
 
-    def draw_face_detection(self, bbox, landmarks):
+    def draw_face_detection(self, bbox, landmarks, color=(255, 255, 0)):
         p1 = (int(bbox[0]), int(bbox[1]))
         p2 = (int(bbox[2]), int(bbox[3]))
-        self.draw_rounded_rectangle(self.canvas, p1, p2, (0, 255, 0), 2, 15, 10)
+        utils.draw_rounded_rectangle(self.canvas, p1, p2, color, 2, 15, 10)
         for landmark in landmarks:
             p = (int(landmark[0]), int(landmark[1]))
-            cv2.circle(self.canvas, center=p, radius=3, color=(255, 255, 0), thickness=1, lineType=cv2.LINE_AA)
+            cv2.circle(
+                self.canvas,
+                center=p,
+                radius=3,
+                color=color,
+                thickness=1,
+                lineType=cv2.LINE_AA,
+            )
 
         # Draw the webcam image in the middle of the background.
         rows, cols, _ = self.canvas.shape
@@ -79,14 +132,20 @@ class GUI:
         self.background[
             origin_y : origin_y + rows, origin_x : origin_x + cols
         ] = self.canvas
-        rows, cols, _ = self.canvas.shape
-        self.background[
-            origin_y : origin_y + rows, origin_x : origin_x + cols
-        ] = self.canvas
+        cv2.rectangle(self.background, (origin_x, origin_y), (origin_x + cols, origin_y + rows), (209, 140, 5), 5, cv2.LINE_AA)
+        cv2.rectangle(self.background, (origin_x, origin_y), (origin_x + cols, origin_y + rows), (215, 194, 165), 2, cv2.LINE_AA)
 
     def on_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
-            print("click")
+            self.check_click_inside_buttons(x, y)
+
+    def check_click_inside_buttons(self, x, y):
+        if utils.rect_contains(self.btn_call_rect, (x, y)):
+            self.mode = Mode.CALL
+        elif utils.rect_contains(self.btn_register_rect, (x, y)):
+            self.mode = Mode.REGISTER
+        if utils.rect_contains(self.btn_class_file_rect, (x, y)):
+            self.mode = Mode.LOAD_FILE
             from tkinter import Tk
             from tkinter.filedialog import askopenfilename
 
